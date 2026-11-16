@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase as sb } from '../supabaseClient.js/supabaseClient';
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
@@ -9,8 +9,6 @@ export default function Home() {
   const [view, setView] = useState('home');
   const [stats, setStats] = useState<any>(null);
   const [message, setMessage] = useState('');
-
-  const sb = createClientComponentClient();
 
   useEffect(() => {
     async function checkUser() {
@@ -22,14 +20,14 @@ export default function Home() {
         setLoading(false);
       }
     }
+    async function fetchProfile(uid: string) {
+      const { data, error } = await sb.from('profiles').select('*').eq('id', uid).maybeSingle();
+      if (error) setMessage('تعذر تحميل بيانات الحساب');
+      else if (data) setProfile(data);
+      setLoading(false);
+    }
     checkUser();
-  }, [sb]);
-
-  async function fetchProfile(uid: string) {
-    const { data } = await sb.from('profiles').select('*').eq('id', uid).single();
-    if (data) setProfile(data);
-    setLoading(false);
-  }
+  }, []);
 
   const isManager = profile?.role === 'manager';
 
@@ -46,8 +44,9 @@ export default function Home() {
     setMessage('');
     if (sectionId === 'reports' && isManager) {
       const today = new Date().toISOString().slice(0, 10);
-      const { data } = await sb.rpc('manager_daily_summary', { p_date: today });
-      if (data) setStats(data[0]);
+      const { data, error } = await sb.rpc('manager_daily_summary', { p_date: today });
+      if (error) setMessage('تعذر تحميل التقرير');
+      else if (data?.[0]) setStats(data[0]);
     }
   }
 
@@ -55,7 +54,7 @@ export default function Home() {
 
   if (!user) {
     return (
-      <div style={{ background: '#070707', minHeight: '100v', color: '#fff', padding: '40px', textAlign: 'center', fontFamily: 'Tahoma' }}>
+      <div style={{ background: '#070707', minHeight: '100vh', color: '#fff', padding: '40px', textAlign: 'center', fontFamily: 'Tahoma' }}>
         <h1 style={{ fontSize: '40px', fontWeight: '900', color: '#d4ad55' }}>معجنات الريان</h1>
         <div style={{ width: '80px', height: '3px', background: '#d4ad55', margin: '20px auto' }}></div>
         <p style={{ color: '#aaa' }}>نظام الإدارة - يرجى تسجيل الدخول</p>
@@ -86,6 +85,7 @@ export default function Home() {
       </header>
 
       <main style={{ maxWidth: '1200px', margin: '30px auto', padding: '0 20px' }}>
+        {message && <p style={{ color: '#ff4444', marginBottom: '20px' }}>{message}</p>}
         {view === 'home' && (
           <div>
             <h1 style={{ textAlign: 'center', marginBottom: '40px' }}>لوحة التحكم الرئيسية</h1>
@@ -109,14 +109,16 @@ export default function Home() {
             <h2>الدوام والساعات الإضافية</h2>
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button onClick={async () => {
-                await sb.from('attendance').insert({ user_id: user.id, work_date: new Date().toISOString().slice(0, 10), clock_in: new Date().toISOString() });
-                alert('تم تسجيل الحضور');
+                const { error } = await sb.from('attendance').insert({ user_id: user.id, work_date: new Date().toISOString().slice(0, 10), clock_in: new Date().toISOString() });
+                alert(error ? 'تعذر تسجيل الحضور، حاول مرة أخرى' : 'تم تسجيل الحضور');
               }} style={{ background: '#2e7d32', border: 'none', color: '#fff', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer' }}>تسجيل الحضور</button>
               <button onClick={async () => {
-                const { data } = await sb.from('attendance').select('id').eq('user_id', user.id).eq('work_date', new Date().toISOString().slice(0, 10)).is('clock_out', null).single();
-                if (data) {
-                  await sb.from('attendance').update({ clock_out: new Date().toISOString() }).eq('id', data.id);
-                  alert('تم تسجيل الانصراف');
+                const { data, error } = await sb.from('attendance').select('id').eq('user_id', user.id).eq('work_date', new Date().toISOString().slice(0, 10)).is('clock_out', null).maybeSingle();
+                if (error) {
+                  alert('تعذر تسجيل الانصراف، حاول مرة أخرى');
+                } else if (data) {
+                  const { error: updateError } = await sb.from('attendance').update({ clock_out: new Date().toISOString() }).eq('id', data.id);
+                  alert(updateError ? 'تعذر تسجيل الانصراف، حاول مرة أخرى' : 'تم تسجيل الانصراف');
                 } else {
                   alert('لا يوجد سجل حضور مفتوح اليوم');
                 }
@@ -134,8 +136,8 @@ export default function Home() {
               const name = (document.getElementById('inv_name') as HTMLInputElement).value;
               const amount = (document.getElementById('inv_amount') as HTMLInputElement).value;
               if (name && amount) {
-                await sb.from('expenses').insert({ user_id: user.id, invoice_name: name, amount: parseFloat(amount) });
-                alert('تمت إضافة المصروف');
+                const { error } = await sb.from('expenses').insert({ user_id: user.id, invoice_name: name, amount: parseFloat(amount) });
+                alert(error ? 'تعذر حفظ المصروف، حاول مرة أخرى' : 'تمت إضافة المصروف');
               }
             }} style={{ background: '#d4ad55', color: '#000', border: 'none', padding: '10px', width: '100%', fontWeight: 'bold', borderRadius: '5px', cursor: 'pointer' }}>حفظ المصروف</button>
           </div>
@@ -148,8 +150,8 @@ export default function Home() {
             <button onClick={async () => {
               const amount = (document.getElementById('cash_amount') as HTMLInputElement).value;
               if (amount) {
-                await sb.from('cash_records').insert({ user_id: user.id, amount: parseFloat(amount) });
-                alert('تم حفظ المبلغ');
+                const { error } = await sb.from('cash_records').insert({ user_id: user.id, amount: parseFloat(amount) });
+                alert(error ? 'تعذر حفظ المبلغ، حاول مرة أخرى' : 'تم حفظ المبلغ');
               }
             }} style={{ background: '#d4ad55', color: '#000', border: 'none', padding: '10px', width: '100%', fontWeight: 'bold', borderRadius: '5px', cursor: 'pointer' }}>حفظ الكاش</button>
           </div>
