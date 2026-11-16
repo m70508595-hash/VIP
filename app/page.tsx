@@ -79,13 +79,13 @@ export default function AlRayyanSystem() {
   const refreshAllData = async (currentProf = profile) => {
     if (!currentProf) return;
     const isMgr = currentProf.role === 'manager';
-    const [att, ovt, exp, csh, adv, sett] = await Promise.all([
+    const [att, ovt, exp, csh, adv, setRes] = await Promise.all([
       supabase.from('attendance').select('*, profiles(full_name)').order('created_at', { ascending: false }),
       supabase.from('overtime').select('*, profiles(full_name, overtime_rate)').order('created_at', { ascending: false }),
       supabase.from('expenses').select('*, profiles(full_name)').order('created_at', { ascending: false }),
       supabase.from('cash_logs').select('*, profiles(full_name)').order('created_at', { ascending: false }),
       supabase.from('advances_deductions').select('*, profiles(full_name)').order('created_at', { ascending: false }),
-      supabase.from('system_settings').select('*').eq('id', 1).single(),
+      supabase.from('app_settings').select('key, value').eq('key', 'activation_code').single(),
     ]);
 
     setAttendanceList(att.data || []);
@@ -93,7 +93,9 @@ export default function AlRayyanSystem() {
     setExpensesList(exp.data || []);
     setCashList(csh.data || []);
     setAdvancesList(adv.data || []);
-    if (sett.data) setSettings(sett.data);
+    if (setRes.data) {
+      setSettings(prev => ({ ...prev, [setRes.data.key]: setRes.data.value }));
+    }
 
     if (isMgr) {
       const [emps, logs] = await Promise.all([
@@ -119,8 +121,8 @@ export default function AlRayyanSystem() {
     e.preventDefault();
     setAuthMsg('');
     if (authMode === 'register') {
-      const { data: sys } = await supabase.from('system_settings').select('activation_code').eq('id', 1).single();
-      if (!sys || activationCode !== sys.activation_code) {
+      const { data: sys, error: sysErr } = await supabase.from('app_settings').select('value').eq('key', 'activation_code').single();
+      if (sysErr || !sys || activationCode !== sys.value) {
         setAuthMsg('❌ كود التفعيل غير صحيح.');
         return;
       }
@@ -146,7 +148,7 @@ export default function AlRayyanSystem() {
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        setAuthMsg('❌ البريد أو كلمة المرور غير صحيحة.');
+        setAuthMsg('ور غير صحيحة.');
       } else {
         checkSession();
       }
@@ -176,6 +178,34 @@ export default function AlRayyanSystem() {
     await supabase.from('attendance').update({ check_out: now.toISOString(), total_hours: hours }).eq('id', record.id);
     await logAudit('تسجيل نهاية دوام', 'attendance', { hours });
     notify(`✅ تم إنهاء الدوام (${hours} ساعة)`);
+    refreshAllData();
+  };
+
+  const handleEditAttendance = async (id: string, newHours: number) => {
+    await supabase.from('attendance').update({ total_hours: newHours, edited_by: profile.id }).eq('id', id);
+    await logAudit('تعديل ساعات دوام موظف', 'attendance', { record_id: id, newHours });
+    notify('✅ تم تعديل الساعات وتسجيل العملية');
+    refreshAllData();
+  };
+
+  const handleAddOvertime = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!overtimeHours) return;
+    await supabase.from('overtime').insert({
+      user_id: profile.id,
+      hours: Number(overtimeHours),
+      rate_at_time: profile.overtime_rate || settings.default_overtime_rate,
+    });
+    setOvertimeHours('');
+    notify('✅ تم إرسال طلب الساعات الإضافية للمدير');
+    refreshAllData();
+  };
+
+  const handleOvertimeDecision = async (item: any, status: 'approved' | 'rejected') => {
+    const rate = item.profiles?.overtime_rate || settings.default_overtime_rate;
+    await supabase.from('overtime').update({ status, rate_at_time: rate }).eq('id', item.id);
+    await logAudit(`قرار إضافي: ${status}`, 'overtime', { id: item.id, employee: item.profiles?.full_name });
+    notify(status === 'approved' ? '✅ تم اعتماد الساعات الإضافية' : '❌ تم رفض الطلب');
     refreshAllData();
   };
 
@@ -288,6 +318,7 @@ export default function AlRayyanSystem() {
 
   return (
     <div dir="rtl" style={{ background: THEME.bg, color: THEME.text, minHeight: '100vh', fontFamily: 'system-ui, sans-serif', paddingBottom: 40 }}>
+      {/* الشريط العلوي */}
       <header style={{ background: THEME.card, borderBottom: `1px solid ${THEME.border}`, padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
         <div>
           <h1 style={{ color: THEME.gold, fontSize: 20, margin: 0 }}>معجنات الريان</h1>
