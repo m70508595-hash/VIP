@@ -1,113 +1,189 @@
-import Image from 'next/image';
+"use client";
+import { useEffect, useState } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Home() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('home');
+  const [stats, setStats] = useState<any>(null);
+  const [message, setMessage] = useState('');
+
+  const sb = createClientComponentClient();
+
+  useEffect(() => {
+    async function checkUser() {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        setUser(session.user);
+        fetchProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    }
+    checkUser();
+  }, [sb]);
+
+  async function fetchProfile(uid: string) {
+    const { data } = await sb.from('profiles').select('*').eq('id', uid).single();
+    if (data) setProfile(data);
+    setLoading(false);
+  }
+
+  const isManager = profile?.role === 'manager';
+
+  const menuItems = [
+    { id: 'attendance', label: 'الدوام والساعات الإضافية', icon: '🕐', role: 'employee' },
+    { id: 'expenses', label: 'مصاريف المحل', icon: '💸', role: 'employee' },
+    { id: 'cash', label: 'مبلغ الكاش', icon: '💰', role: 'employee' },
+    { id: 'salary', label: 'الرواتب والسلف', icon: '💵', role: 'employee' },
+    { id: 'reports', label: 'التقارير', icon: '📊', role: 'manager' },
+  ].filter(item => isManager || item.role === 'employee');
+
+  async function loadSection(sectionId: string) {
+    setView(sectionId);
+    setMessage('');
+    if (sectionId === 'reports' && isManager) {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data } = await sb.rpc('manager_daily_summary', { p_date: today });
+      if (data) setStats(data[0]);
+    }
+  }
+
+  if (loading) return <div style={{ background: '#070707', color: '#d4ad55', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>جاري التحميل...</div>;
+
+  if (!user) {
+    return (
+      <div style={{ background: '#070707', minHeight: '100v', color: '#fff', padding: '40px', textAlign: 'center', fontFamily: 'Tahoma' }}>
+        <h1 style={{ fontSize: '40px', fontWeight: '900', color: '#d4ad55' }}>معجنات الريان</h1>
+        <div style={{ width: '80px', height: '3px', background: '#d4ad55', margin: '20px auto' }}></div>
+        <p style={{ color: '#aaa' }}>نظام الإدارة - يرجى تسجيل الدخول</p>
+        <div style={{ maxWidth: '400px', margin: '40px auto', background: '#111', padding: '20px', borderRadius: '15px', border: '1px solid #333' }}>
+          <input id="email" type="email" placeholder="البريد الإلكتروني" style={{ width: '100%', padding: '10px', background: '#080808', border: '1px solid #444', color: '#fff', borderRadius: '5px', marginBottom: '10px' }} />
+          <input id="pass" type="password" placeholder="كلمة المرور" style={{ width: '100%', padding: '10px', background: '#080808', border: '1px solid #444', color: '#fff', borderRadius: '5px', marginBottom: '20px' }} />
+          <button onClick={async () => {
+            const email = (document.getElementById('email') as HTMLInputElement).value;
+            const pass = (document.getElementById('pass') as HTMLInputElement).value;
+            const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+            if (error) setMessage(error.message);
+            else window.location.reload();
+          }} style={{ width: '100%', padding: '12px', background: '#d4ad55', border: 'none', color: '#000', fontWeight: 'bold', borderRadius: '5px', cursor: 'pointer' }}>دخول</button>
+          {message && <p style={{ color: '#ff4444', marginTop: '15px' }}>{message}</p>}
         </div>
       </div>
+    );
+  }
 
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
+  return (
+    <div style={{ background: '#070707', minHeight: '100vh', color: '#f7f7f7', fontFamily: 'Tahoma', paddingBottom: '50px' }}>
+      <header style={{ background: '#111', borderBottom: '1px solid #282828', padding: '15px 30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h2 style={{ margin: 0, color: '#d4ad55' }}>معجنات الريان</h2>
+          <small style={{ color: '#888' }}>{profile?.full_name} ({isManager ? 'مدير' : 'موظف'})</small>
+        </div>
+        <button onClick={() => sb.auth.signOut().then(() => window.location.reload())} style={{ background: '#222', border: '1px solid #444', color: '#aaa', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer' }}>تسجيل الخروج</button>
+      </header>
 
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
+      <main style={{ maxWidth: '1200px', margin: '30px auto', padding: '0 20px' }}>
+        {view === 'home' && (
+          <div>
+            <h1 style={{ textAlign: 'center', marginBottom: '40px' }}>لوحة التحكم الرئيسية</h1>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+              {menuItems.map(item => (
+                <button key={item.id} onClick={() => loadSection(item.id)} style={{ background: '#111', border: '1px solid #292929', borderRadius: '15px', padding: '25px', color: '#fff', textAlign: 'center', cursor: 'pointer', transition: 'border 0.3s' }}>
+                  <div style={{ fontSize: '40px', marginBottom: '10px' }}>{item.icon}</div>
+                  <h3 style={{ margin: '0 0 10px 0' }}>{item.label}</h3>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
+        {view !== 'home' && (
+          <button onClick={() => setView('home')} style={{ background: 'transparent', border: '1px solid #444', color: '#d4ad55', padding: '8px 15px', borderRadius: '5px', marginBottom: '20px', cursor: 'pointer' }}>← العودة للرئيسية</button>
+        )}
 
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore the Next.js 13 playground.
-          </p>
-        </a>
+        {view === 'attendance' && (
+          <div style={{ background: '#111', padding: '20px', borderRadius: '15px', border: '1px solid #292929' }}>
+            <h2>الدوام والساعات الإضافية</h2>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button onClick={async () => {
+                await sb.from('attendance').insert({ user_id: user.id, work_date: new Date().toISOString().slice(0, 10), clock_in: new Date().toISOString() });
+                alert('تم تسجيل الحضور');
+              }} style={{ background: '#2e7d32', border: 'none', color: '#fff', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer' }}>تسجيل الحضور</button>
+              <button onClick={async () => {
+                const { data } = await sb.from('attendance').select('id').eq('user_id', user.id).eq('work_date', new Date().toISOString().slice(0, 10)).is('clock_out', null).single();
+                if (data) {
+                  await sb.from('attendance').update({ clock_out: new Date().toISOString() }).eq('id', data.id);
+                  alert('تم تسجيل الانصراف');
+                } else {
+                  alert('لا يوجد سجل حضور مفتوح اليوم');
+                }
+              }} style={{ background: '#c62828', border: 'none', color: '#fff', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer' }}>تسجيل الانصراف</button>
+            </div>
+          </div>
+        )}
 
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+        {view === 'expenses' && (
+          <div style={{ background: '#111', padding: '20px', borderRadius: '15px', border: '1px solid #292929' }}>
+            <h2>مصاريف المحل</h2>
+            <input id="inv_name" type="text" placeholder="اسم الفاتورة" style={{ width: '100%', padding: '10px', background: '#080808', border: '1px solid #444', color: '#fff', borderRadius: '5px', marginBottom: '10px' }} />
+            <input id="inv_amount" type="number" placeholder="المبلغ" style={{ width: '100%', padding: '10px', background: '#080808', border: '1px solid #444', color: '#fff', borderRadius: '5px', marginBottom: '20px' }} />
+            <button onClick={async () => {
+              const name = (document.getElementById('inv_name') as HTMLInputElement).value;
+              const amount = (document.getElementById('inv_amount') as HTMLInputElement).value;
+              if (name && amount) {
+                await sb.from('expenses').insert({ user_id: user.id, invoice_name: name, amount: parseFloat(amount) });
+                alert('تمت إضافة المصروف');
+              }
+            }} style={{ background: '#d4ad55', color: '#000', border: 'none', padding: '10px', width: '100%', fontWeight: 'bold', borderRadius: '5px', cursor: 'pointer' }}>حفظ المصروف</button>
+          </div>
+        )}
+
+        {view === 'cash' && (
+          <div style={{ background: '#111', padding: '20px', borderRadius: '15px', border: '1px solid #292929' }}>
+            <h2>تسجيل مبلغ الكاش</h2>
+            <input id="cash_amount" type="number" placeholder="المبلغ الحالي" style={{ width: '100%', padding: '10px', background: '#080808', border: '1px solid #444', color: '#fff', borderRadius: '5px', marginBottom: '20px' }} />
+            <button onClick={async () => {
+              const amount = (document.getElementById('cash_amount') as HTMLInputElement).value;
+              if (amount) {
+                await sb.from('cash_records').insert({ user_id: user.id, amount: parseFloat(amount) });
+                alert('تم حفظ المبلغ');
+              }
+            }} style={{ background: '#d4ad55', color: '#000', border: 'none', padding: '10px', width: '100%', fontWeight: 'bold', borderRadius: '5px', cursor: 'pointer' }}>حفظ الكاش</button>
+          </div>
+        )}
+
+        {view === 'salary' && (
+          <div style={{ background: '#111', padding: '20px', borderRadius: '15px', border: '1px solid #292929' }}>
+            <h2>الرواتب والسلف</h2>
+            <p>مرحباً بك، يمكنك متابعة مستحقاتك المالية من خلال الإدارة المباشرة.</p>
+          </div>
+        )}
+
+        {view === 'reports' && isManager && (
+          <div style={{ background: '#111', padding: '20px', borderRadius: '15px', border: '1px solid #292929' }}>
+            <h2>التقارير اليومية</h2>
+            {stats ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginTop: '20px' }}>
+                <div style={{ background: '#080808', padding: '20px', borderRadius: '10px', textAlign: 'center' }}>
+                  <h4>إجمالي الكاش</h4>
+                  <p style={{ fontSize: '24px', color: '#d4ad55' }}>{stats.cash_total || 0}</p>
+                </div>
+                <div style={{ background: '#080808', padding: '20px', borderRadius: '10px', textAlign: 'center' }}>
+                  <h4>إجمالي المصاريف</h4>
+                  <p style={{ fontSize: '24px', color: '#ff4444' }}>{stats.expenses_total || 0}</p>
+                </div>
+                <div style={{ background: '#080808', padding: '20px', borderRadius: '10px', textAlign: 'center' }}>
+                  <h4>إجمالي السلف</h4>
+                  <p style={{ fontSize: '24px', color: '#ffa726' }}>{stats.advances_total || 0}</p>
+                </div>
+              </div>
+            ) : <p>جاري تحميل البيانات...</p>}
+          </div>
+        )}
+      </main>
+    </div>
   );
 }
