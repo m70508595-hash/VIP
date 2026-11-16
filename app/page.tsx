@@ -3,8 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 // استبدل بالمعاملات الخاصة بك من لوحة تحكم Supabase
-const SUPABASE_URL = "YOUR_SUPABASE_URL";
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+const SUPABASE_URL = https:"sb_publishable_Mi8XqXRgMNRzwU9-uMepkg_RI0E7Aer"
+const SUPABASE_ANON_KEY = "sb_publishable_Mi8XqXRgMNRzwU9-uMepkg_RI0E7Aer";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const THEME = {
