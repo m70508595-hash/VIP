@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = "https://dbjdtskrgueclkqinlck.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_Hi8XqRgHHRzwU9-uHepk..."; // استخدم مفتاحك الكامل هنا
+const SUPABASE_ANON_KEY = "sb_publishable_Mi8XqXRgMNRzwU9-uMepkg_RI0E7Aer"; // استخدم مفتاحك الكامل هنا
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export default function AlRayyanSystem() {
