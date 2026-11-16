@@ -2,9 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// استبدل بالمعاملات الخاصة بك من لوحة تحكم Supabase
-const SUPABASE_URL = "YOUR_SUPABASE_URL";
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+const SUPABASE_URL = "https://dbjdtskrgueclkqinlck.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_Mi8XqXRgMNRzwU9-uMepkg_RI0E7Aer";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const THEME = {
@@ -180,34 +179,6 @@ export default function AlRayyanSystem() {
     refreshAllData();
   };
 
-  const handleEditAttendance = async (id: string, newHours: number) => {
-    await supabase.from('attendance').update({ total_hours: newHours, edited_by: profile.id }).eq('id', id);
-    await logAudit('تعديل ساعات دوام موظف', 'attendance', { record_id: id, newHours });
-    notify('✅ تم تعديل الساعات وتسجيل العملية');
-    refreshAllData();
-  };
-
-  const handleAddOvertime = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!overtimeHours) return;
-    await supabase.from('overtime').insert({
-      user_id: profile.id,
-      hours: Number(overtimeHours),
-      rate_at_time: profile.overtime_rate || settings.default_overtime_rate,
-    });
-    setOvertimeHours('');
-    notify('✅ تم إرسال طلب الساعات الإضافية للمدير');
-    refreshAllData();
-  };
-
-  const handleOvertimeDecision = async (item: any, status: 'approved' | 'rejected') => {
-    const rate = item.profiles?.overtime_rate || settings.default_overtime_rate;
-    await supabase.from('overtime').update({ status, rate_at_time: rate }).eq('id', item.id);
-    await logAudit(`قرار إضافي: ${status}`, 'overtime', { id: item.id, employee: item.profiles?.full_name });
-    notify(status === 'approved' ? '✅ تم اعتماد الساعات الإضافية' : '❌ تم رفض الطلب');
-    refreshAllData();
-  };
-
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!expenseTitle || !expenseAmount) return;
@@ -232,7 +203,7 @@ export default function AlRayyanSystem() {
     });
     await logAudit('تسجيل مبلغ كاش', 'cash_logs', { amount: cashAmount });
     setCashAmount('');
-    notify('✅ تم حفظ مبلغ كاش');
+    notify('✅ تم حفظ مبلغ الكاش');
     refreshAllData();
   };
 
@@ -286,7 +257,7 @@ export default function AlRayyanSystem() {
             {authMsg && <p style={{ color: THEME.danger }}>{authMsg}</p>}
             <button type="submit" style={goldBtnStyle}>{authMode === 'login' ? 'دخول' : 'تسجيل'}</button>
           </form>
-          <button onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')} style={{ background: 'none', border: 'none', color: THEME.gold, marginTop: 15 }}>
+          <button onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')} style={{ background: 'none', border: 'none', color: THEME.gold, marginTop: 15, cursor: 'pointer' }}>
             {authMode === 'login' ? 'حساب جديد؟' : 'لديك حساب؟'}
           </button>
         </div>
@@ -317,7 +288,6 @@ export default function AlRayyanSystem() {
 
   return (
     <div dir="rtl" style={{ background: THEME.bg, color: THEME.text, minHeight: '100vh', fontFamily: 'system-ui, sans-serif', paddingBottom: 40 }}>
-      {/* الشريط العلوي */}
       <header style={{ background: THEME.card, borderBottom: `1px solid ${THEME.border}`, padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
         <div>
           <h1 style={{ color: THEME.gold, fontSize: 20, margin: 0 }}>معجنات الريان</h1>
@@ -358,7 +328,6 @@ export default function AlRayyanSystem() {
           </div>
         )}
 
-        {/* أقسام أخرى للنظام */}
         {activeTab === 'attendance' && (
           <div style={cardStyle}>
             <h2>🕐 سجل الدوام</h2>
@@ -400,4 +369,4 @@ export default function AlRayyanSystem() {
 
 const cardStyle: React.CSSProperties = { background: THEME.card, border: `1px solid ${THEME.border}`, borderRadius: 16, padding: 24 };
 const inputStyle: React.CSSProperties = { background: '#0A0A0A', border: `1px solid ${THEME.border}`, color: '#FFF', padding: 12, borderRadius: 10, width: '100%', boxSizing: 'border-box' };
-const goldBtnStyle: React.CSSProperties = { background: THEME.gold, color: '#000', border: 'none', padding: 12, borderRadius: 2, padding: 12, borderRadius: 10, cursor: 'pointer', fontWeight: 'bold' };
+const goldBtnStyle: React.CSSProperties = { background: THEME.gold, color: '#000', border: 'none', padding: 12, borderRadius: 10, cursor: 'pointer', fontWeight: 'bold' };
